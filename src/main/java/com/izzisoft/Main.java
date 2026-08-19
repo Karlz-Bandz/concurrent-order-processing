@@ -2,13 +2,15 @@ package com.izzisoft;
 
 import com.izzisoft.model.Inventory;
 import com.izzisoft.model.Order;
-import com.izzisoft.model.OrderType;
+import com.izzisoft.model.OrderStatistics;
 import com.izzisoft.model.Product;
+import com.izzisoft.service.OrderProducer;
 import com.izzisoft.service.OrderService;
 import com.izzisoft.service.OrderWorker;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -21,7 +23,6 @@ public class Main {
 
         BlockingQueue<Order> orders = new LinkedBlockingQueue<>();
         OrderService orderService = new OrderService(orders);
-
 
         Product product1 = new Product.Builder()
                 .id(1L)
@@ -39,51 +40,19 @@ public class Main {
                 .price(BigDecimal.valueOf(12.34))
                 .build();
 
-        Order order1 = new Order.Builder()
-                .id(1L)
-                .product(product1)
-                .quantity(3)
-                .build();
+        int workersCount = 1;
+        OrderStatistics orderStatistics = new OrderStatistics();
 
-        Order order2 = new Order.Builder()
-                .id(2L)
-                .product(product1)
-                .quantity(3)
-                .build();
+        List<Product> products = List.of(product1, product2, product3);
 
-        Order order3 = new Order.Builder()
-                .id(3L)
-                .product(product3)
-                .quantity(12)
-                .build();
-
-        Order order4 = new Order.Builder()
-                .id(2L)
-                .product(product3)
-                .quantity(2)
-                .build();
-
-        Order orderStop = new Order.Builder()
-                .orderType(OrderType.STOP)
-                .build();
-
-        orderService.addOrder(order1);
-        orderService.addOrder(order2);
-        orderService.addOrder(order3);
-        orderService.addOrder(order4);
-
-        int workersCount = 4;
-
-        for (int i = 0; i < workersCount; i++) {
-            orderService.addOrder(orderStop);
-        }
+        OrderProducer orderProducer = new OrderProducer(orderService, products, workersCount);
 
         Map<Long, Integer> stock = new HashMap<>();
-        stock.put(product1.getId(), 10);
-        stock.put(product2.getId(), 5);
-        stock.put(product3.getId(), 2);
+        stock.put(product1.getId(), 1272);
+        stock.put(product2.getId(), 9934);
+        stock.put(product3.getId(), 7913);
 
-        System.out.println("Initial stock: " + stock);
+        System.out.println("Initial inventory: " + stock);
 
         Inventory inventory = new Inventory(stock);
 
@@ -91,8 +60,10 @@ public class Main {
 
         ExecutorService executorService = Executors.newFixedThreadPool(workersCount);
 
+        executorService.execute(orderProducer);
+
         for (int i = 0; i < workersCount; i++) {
-            executorService.execute(new OrderWorker(orderService, inventory));
+            executorService.execute(new OrderWorker(orderService, inventory, orderStatistics));
         }
 
         executorService.shutdown();
@@ -100,8 +71,11 @@ public class Main {
 
         long end = System.currentTimeMillis();
 
+        System.out.println("---LOG---");
         System.out.println("Time: " + (end - start) + " ms");
-
-        System.out.println(inventory.getStock());
+        System.out.println("Processed orders: " + orderStatistics.getProcessedOrders());
+        System.out.println("Successes orders: " + orderStatistics.getSuccessfulReservations());
+        System.out.println("Failed orders: " + orderStatistics.getFailedReservations());
+        System.out.println("Current inventory: " + inventory.getStock());
     }
 }
