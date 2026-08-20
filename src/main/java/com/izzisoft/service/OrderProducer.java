@@ -24,7 +24,7 @@ public class OrderProducer implements Runnable {
     @Override
     public void run() {
 
-        for (int i = 0; i < 1000; i++) {
+        for (int i = 0; i < 10000; i++) {
             Order order = new Order.Builder()
                     .id(ThreadLocalRandom.current().nextLong(200000))
                     .product(products.get(ThreadLocalRandom.current().nextInt(products.size())))
